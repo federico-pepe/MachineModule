@@ -47,7 +47,7 @@ cd src && go test -race ./...
 
 ## Status
 
-Alpha. The audio engine, sequencer and front panel are tested on a development machine; the Push, Live and loopback integration (`src/*.go` in the main package) follows the patterns of the other Push Hack audio modules but has **not yet been run on real hardware**. Expect rough edges and please open issues.
+Beta. The audio engine, sequencer, and front panel has been tested on Push 3 Standalone and run with no apparent issues. Some small UI issues remain and will need sorting; please open issues if you encounter any.
 
 ## Not (yet) implemented
 
