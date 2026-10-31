@@ -2,9 +2,9 @@
   "id": "machinemodule",
   "name": "MachineModule",
   "description": "Machinedrum-style drum machine for Push 3: 16 synth/sample tracks, sequencer with parameter locks, effects, kits and songs.",
-  "author": "ragdolljoseph",
+  "author": "joman66",
   "homepage": "https://github.com/ragdolljoseph/push-hack-machinemodule",
-  "github_repo": "ragdolljoseph/push-hack-machinemodule",
+  "github_repo": "joman66/MachineModule",
   "default_branch": "main",
   "asset_name": "machinemodule.tar.gz",
   "requires": ["push-audio-loopback"]
