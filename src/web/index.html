@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MachineModule</title>
+<style>
+:root{--bg:#15171a;--panel:#1d2024;--line:#2c3036;--text:#d9dde2;--dim:#8b929b;--accent:#ff6a1a;--on:#ffb020;--lock:#4cc9f0;--ok:#5bd778;--bad:#ff5a5a;--lcd:#9fe870;--lcdbg:#0e1a0e}
+@media (prefers-color-scheme:light){:root{--bg:#e9eaec;--panel:#f6f6f7;--line:#c9ccd1;--text:#1d2024;--dim:#5d646d;--accent:#d9500a;--on:#e08a00;--lock:#0b7aa8;--ok:#1f8a3b;--bad:#c62828;--lcd:#173a17;--lcdbg:#bfe3a6}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+h1{font-size:15px;margin:0;letter-spacing:.08em}
+h1 b{color:var(--accent)}
+main{padding:16px;display:grid;gap:16px;max-width:1200px;margin:0 auto}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
+h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
+a{color:inherit;text-decoration:none}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.on{background:var(--accent);color:#000;border-color:var(--accent)}
+select,input[type=number],input[type=text]{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.lcd{background:var(--lcdbg);color:var(--lcd);font:600 15px ui-monospace,Menlo,monospace;padding:6px 10px;border-radius:4px;border:1px solid var(--line)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grow{flex:1}
+#status{font-size:12px;color:var(--dim)}
+#status.bad{color:var(--bad)}
+#status.ok{color:var(--ok)}
+.seq{display:grid;grid-template-columns:96px 1fr;gap:3px;align-items:center;overflow-x:auto}
+.name{font:12px ui-monospace,monospace;color:var(--dim);cursor:pointer;white-space:nowrap;padding:2px 4px;border-radius:4px}
+.name.sel{color:var(--text);background:var(--line)}
+.name.mute{text-decoration:line-through;opacity:.5}
+.steps{display:grid;gap:3px;grid-auto-flow:column;grid-auto-columns:minmax(18px,1fr)}
+.st{height:22px;border-radius:3px;background:var(--bg);border:1px solid var(--line);cursor:pointer;padding:0}
+.st.b4{border-color:var(--dim)}
+.st.x{background:var(--on);border-color:var(--on)}
+.st.L{background:var(--lock);border-color:var(--lock)}
+.st.cur{outline:2px solid var(--accent);outline-offset:1px}
+.params{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.p label{display:flex;justify-content:space-between;font:12px ui-monospace,monospace;color:var(--dim)}
+.p input[type=range]{width:100%;accent-color:var(--accent)}
+.grp{grid-column:1/-1;font-size:11px;letter-spacing:.1em;color:var(--dim);margin-top:6px;border-top:1px solid var(--line);padding-top:6px}
+.waves{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px}
+.w{border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.w.full{border-color:var(--accent)}
+.meter{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;width:120px}
+.meter i{display:block;height:100%;background:var(--ok);width:0}
+.note{color:var(--dim);font-size:12px}
+pre{white-space:pre-wrap;margin:6px 0 0;font-size:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>MACHINE<b>MODULE</b></h1>
+  <button id="play">Play</button><button id="stop">Stop</button><button id="rec">Rec</button>
+  <label>BPM <input id="tempo" type="number" min="30" max="300" step="0.1" style="width:80px"></label>
+  <label>Sync <select id="sync"><option value="0">Internal</option><option value="1">MIDI clock</option></select></label>
+  <span class="lcd" id="pat">A01</span><span class="lcd" id="kit">KIT 01</span>
+  <span class="meter"><i id="master"></i></span>
+  <span class="grow"></span><span id="status">connecting...</span>
+</header>
+<main>
+<section><h2>Sequencer</h2>
+  <div class="row" style="margin-bottom:8px">
+    <label>Pattern <select id="patsel"></select></label>
+    <label><input type="checkbox" id="now"> switch now</label>
+    <span class="note">Click a step to toggle a trig. Blue steps carry parameter locks (set on the Push).</span>
+  </div>
+  <div class="seq" id="seq"></div>
+</section>
+<section><h2 id="trkTitle">Track</h2>
+  <div class="row" style="margin-bottom:10px">
+    <label>Machine <select id="machine"></select></label>
+    <button id="hit">Trigger</button><button id="mute">Mute</button>
+  </div>
+  <div class="params" id="params"></div>
+</section>
+<section><h2>Global effects &amp; kit</h2>
+  <div class="params" id="globals"></div>
+  <div class="row" style="margin-top:10px">
+    <label>Kit <input id="kitn" type="number" min="1" max="64" value="1" style="width:70px"></label>
+    <button id="kitload">Load</button><button id="kitsave">Save</button><button id="kitreset">Init kit</button>
+  </div>
+</section>
+<section><h2>UserWave samples <span id="mem" class="note"></span></h2>
+  <div class="row" style="margin-bottom:8px">
+    <label>Slot <input id="slot" type="number" min="1" max="64" value="1" style="width:70px"></label>
+    <input type="file" id="file" accept=".wav,audio/wav">
+    <button id="upload">Load into slot</button>
+    <select id="imports"></select><button id="imp">Load from imports</button>
+  </div>
+  <div class="note" style="margin-bottom:8px">WAV, 8-32 bit PCM or float, mono or stereo (mixed to mono), up to 60 s. Use the UW machines to play a slot (set its slot number on the Push or with the parameter sliders).</div>
+  <div class="waves" id="waves"></div>
+</section>
+<section><h2>Setup</h2>
+  <div class="row">
+    <button id="mktracks">Create tracks in Live</button>
+    <label>Channel pair <input id="choff" type="number" min="1" max="63" style="width:70px"></label>
+    <label>External MIDI channel <select id="midich"></select></label>
+    <button id="cfg">Apply</button>
+  </div>
+  <pre id="msg"></pre>
+  <div class="row" style="margin-top:10px">
+    <a href="/api/project"><button>Download project</button></a>
+    <label class="note">Load project <input type="file" id="projfile" accept=".json"></label>
+  </div>
+  <p class="note">External MIDI: notes 36-51 play tracks 1-16. CC 16-111 set track parameters (24 per track, four tracks per channel: tracks 1-4 on the base channel, 5-8 on the next, ...). CC 112 master volume, 113 tempo (30-157), 114 mute all. Program change selects a pattern. Clock, start and stop follow when Sync is MIDI clock.</p>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let S=null, M=null, sel=0, lastKey='';
+const api=(p,b,m='POST')=>fetch(p,{method:m,headers:{'Content-Type':'application/json'},body:b===undefined?undefined:JSON.stringify(b)}).then(async r=>{if(!r.ok)throw new Error(await r.text());return r.json().catch(()=>({}))});
+const say=t=>{$('msg').textContent=t};
+const guard=f=>async(...a)=>{try{await f(...a)}catch(e){say(String(e.message||e))}};
+const bankName=n=>'ABCDEFGH'[n>>4]+String((n&15)+1).padStart(2,'0');
+const sliders={};
+function build(){
+  const ps=$('patsel');for(let i=0;i<128;i++)ps.add(new Option(bankName(i),i));
+  const mc=$('midich');mc.add(new Option('any (base 1)',-1));for(let i=0;i<16;i++)mc.add(new Option(String(i+1),i));
+  const g=$('globals');
+  M.global.forEach((n,i)=>g.append(slider('g'+i,n,v=>api('/api/global',{index:i,value:v}))));
+  const ms=$('machine');let grp='';
+  M.machines.forEach(m=>{if(m.group!==grp){grp=m.group}ms.add(new Option(m.name,m.id))});
+  const sq=$('seq');
+  for(let t=0;t<16;t++){const n=document.createElement('div');n.className='name';n.id='n'+t;n.onclick=()=>{sel=t;lastKey='';draw()};sq.append(n);const row=document.createElement('div');row.className='steps';row.id='r'+t;sq.append(row)}
+}
+function slider(id,label,onchange){
+  const d=document.createElement('div');d.className='p';
+  d.innerHTML=`<label><span class="l">${label}</span><span class="v">0</span></label><input type="range" min="0" max="127" value="0">`;
+  const r=d.querySelector('input'),v=d.querySelector('.v');
+  r.oninput=()=>{v.textContent=r.value;onchange(+r.value)};
+  sliders[id]={r,v,l:d.querySelector('.l'),el:d,drag:false};
+  r.onpointerdown=()=>sliders[id].drag=true;r.onpointerup=()=>sliders[id].drag=false;
+  return d;
+}
+function setSlider(id,val,label){const s=sliders[id];if(!s)return;if(label!==undefined)s.l.textContent=label;if(!s.drag){s.r.value=val;s.v.textContent=val}}
+function draw(){
+  if(!S||!M)return;
+  $('play').classList.toggle('on',S.playing);$('rec').classList.toggle('on',S.record);
+  if(document.activeElement!==$('tempo'))$('tempo').value=S.tempo.toFixed(1);
+  $('sync').value=S.sync;$('pat').textContent=S.patternName+(S.next>=0?'>'+bankName(S.next):'');
+  $('kit').textContent=S.kit.name||('KIT '+(S.kit.n+1));
+  if(document.activeElement!==$('patsel'))$('patsel').value=S.pattern;
+  $('master').style.width=Math.min(100,S.master*100)+'%';
+  const st=$('status');const a=S.audio;st.className=a.ok?'ok':'bad';st.textContent=a.ok?'audio running':(a.message||'no audio').split('\n')[0];st.title=a.message||'';
+  const key=S.grid.join('|')+'|'+S.len;
+  S.tracks.forEach((t,i)=>{const n=$('n'+i);n.textContent=String(i+1).padStart(2,'0')+' '+t.name;n.className='name'+(i===sel?' sel':'')+(t.mute?' mute':'')});
+  if(key!==lastKey){
+    lastKey=key;
+    S.grid.forEach((g,t)=>{const row=$('r'+t);row.innerHTML='';row.style.gridTemplateColumns='';
+      for(let s=0;s<g.length;s++){const b=document.createElement('button');b.className='st'+(g[s]==='x'?' x':g[s]==='L'?' L':'')+(s%4===0?' b4':'');b.onclick=guard(()=>api('/api/trig',{track:t,step:s,on:g[s]==='.'}));row.append(b)}})
+  }
+  S.grid.forEach((g,t)=>{const row=$('r'+t);if(!row)return;[...row.children].forEach((b,s)=>b.classList.toggle('cur',S.playing&&s===S.step))});
+  const T=S.tracks[sel];$('trkTitle').textContent='Track '+(sel+1)+' - '+T.name;
+  if(document.activeElement!==$('machine'))$('machine').value=T.machine;
+  $('mute').classList.toggle('on',T.mute);
+  const mk=T.machine+'|'+sel;
+  if(mk!==buildKey){buildKey=mk;const box=$('params');box.innerHTML='';
+    for(let i=0;i<24;i++){if(i%8===0){const h=document.createElement('div');h.className='grp';h.textContent=['SYNTH','EFFECTS','ROUTING / LFO'][i/8];box.append(h)}
+      const id='p'+i;const name=i<8?M.machines[T.machine].params[i]:M.fx[i-8];
+      const el=slider(id,name,v=>api('/api/param',{track:sel,param:i,value:v}));box.append(el)}}
+  T.params.forEach((v,i)=>setSlider('p'+i,v,i<8?M.machines[T.machine].params[i]:M.fx[i-8]));
+  S.global.forEach((v,i)=>setSlider('g'+i,v,M.global[i]));
+  $('mem').textContent='- memory '+(S.waveUsed/S.waveTotal*100).toFixed(0)+'% used';
+  const wk=JSON.stringify(S.waves)+JSON.stringify(S.imports);
+  if(wk!==waveKey){waveKey=wk;const w=$('waves');w.innerHTML='';
+    S.waves.forEach(x=>{const d=document.createElement('div');d.className='w full';d.innerHTML=`<span>UW-${String(x.slot+1).padStart(2,'0')} ${x.name.replace(/</g,'&lt;')}<br><span class="note">${(x.len/x.rate).toFixed(2)} s @ ${x.rate} Hz</span></span>`;
+      const b=document.createElement('button');b.textContent='x';b.title='Clear';b.onclick=guard(()=>api('/api/wave/'+(x.slot+1),undefined,'DELETE'));d.append(b);w.append(d)});
+    const im=$('imports');im.innerHTML='';S.imports.forEach(f=>im.add(new Option(f,f)))}
+  if(document.activeElement!==$('choff')&&!cfgInit){cfgInit=true;$('choff').value=S.config.channel_offset+1;$('midich').value=S.config.midi_channel}
+}
+let buildKey='',waveKey='',cfgInit=false;
+$('play').onclick=guard(()=>api('/api/transport',{action:'toggle'}));
+$('stop').onclick=guard(()=>api('/api/transport',{action:'stop'}));
+$('rec').onclick=guard(()=>api('/api/transport',{action:'record',value:S.record?0:1}));
+$('tempo').onchange=guard(()=>api('/api/transport',{action:'tempo',value:+$('tempo').value}));
+$('sync').onchange=guard(()=>api('/api/transport',{action:'sync',value:+$('sync').value}));
+$('patsel').onchange=guard(()=>api('/api/pattern',{n:+$('patsel').value,now:$('now').checked}));
+$('machine').onchange=guard(()=>api('/api/machine',{track:sel,machine:+$('machine').value}));
+$('hit').onclick=guard(()=>api('/api/hit',{track:sel,vel:0.9}));
+$('mute').onclick=guard(()=>api('/api/mute',{track:sel,mute:!S.tracks[sel].mute}));
+const kit=a=>guard(()=>api('/api/kit',{action:a,n:(+$('kitn').value||1)-1}));
+$('kitload').onclick=kit('load');$('kitsave').onclick=kit('save');$('kitreset').onclick=kit('reset');
+$('upload').onclick=guard(async()=>{const f=$('file').files[0];if(!f)throw new Error('Choose a WAV file first');
+  const r=await fetch('/api/wave/'+$('slot').value+'?name='+encodeURIComponent(f.name),{method:'PUT',body:f});if(!r.ok)throw new Error(await r.text());say('Loaded '+f.name)});
+$('imp').onclick=guard(async()=>{const f=$('imports').value;if(!f)throw new Error('No files in the imports folder');await api('/api/wave/'+$('slot').value+'/import?file='+encodeURIComponent(f));say('Loaded '+f)});
+$('cfg').onclick=guard(async()=>{await api('/api/config',{channel_offset:(+$('choff').value||1)-1,midi_channel:+$('midich').value});say('Saved')});
+$('mktracks').onclick=guard(async()=>{say('Working...');const r=await api('/api/live/tracks',{});say(r.lines.join('\n'))});
+$('projfile').onchange=guard(async()=>{const f=$('projfile').files[0];if(!f)return;const r=await fetch('/api/project',{method:'POST',body:f});if(!r.ok)throw new Error(await r.text());say('Project loaded')});
+Promise.all([fetch('/api/machines').then(r=>r.json()),fetch('/api/state').then(r=>r.json())]).then(([m,s])=>{M=m;S=s;build();draw();
+  const es=new EventSource('/sse/state');es.onmessage=e=>{S=JSON.parse(e.data);draw()};es.onerror=()=>{$('status').textContent='reconnecting...'}});
+</script>
+</body>
+</html>
