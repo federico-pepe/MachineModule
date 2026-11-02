@@ -17,7 +17,7 @@ MachineModule: a [push-hack](https://github.com/federico-pepe/ableton-push-hack)
 | `hwparams/` | parses Live's negotiated hw_params | no |
 | `livelink/` | PushHack Remote Script client (`track.ensure`) | no (Caller is injectable) |
 | `cmd/mmrender/` | renders a pattern to WAV | no |
-| main package | `main.go` (supervisor re-exec), `audio.go`/`pcm.go`/`bridge.c` (cgo ALSA playback only), `midi.go` (port "MachineModule MIDI In"), `surface.go` (RunSurface, frames, LEDs), `web.go` + `web/index.html`, `app.go` | yes (cgo + libasound) |
+| main package | `main.go` (supervisor re-exec), `audio.go` (supervisor, direct card path), `bus.go` (audio bus client), `pcm.go`/`bridge.c` (cgo ALSA playback only, direct path), `midi.go` (port "MachineModule MIDI In"), `surface.go` (RunSurface, frames, LEDs), `web.go` + `web/index.html`, `app.go` | yes (cgo + libasound) |
 
 ## Rules (from the Push Hack framework)
 
@@ -25,12 +25,13 @@ MachineModule: a [push-hack](https://github.com/federico-pepe/ableton-push-hack)
 - On-screen text is ASCII only. Never hardcode ports (`hack.json` "port" is only a default; the catalog allocates).
 - Push controls count only while focused (`app.focus`), and only from Push 3 client 16 port 0, channel 0 for CCs.
 - The render goroutine is pinned (`LockOSThread`, SCHED_FIFO); keep it allocation-free.
-- Open `hw:PHVAudio,1,0` with the params Live negotiated (`hwparams`), S16_LE interleaved, channel pair at `channel_offset`.
+- Audio goes through the push-audio-loopback mixer when one answers on the bus socket (`bus.go`, `core/audiobus`): float blocks to the mixer, which owns the card and the channel pair (`bus_pair` in the config, -1 = the mixer chooses). Without a mixer: open `hw:PHVAudio,1,0` with the params Live negotiated (`hwparams`), S16_LE interleaved, channel pair at `channel_offset`. `superviseAudio` switches by itself. Design: `docs/audio-bus.md` in ableton-push-hack.
+- `core/audiobus` comes from `core/v0.5.3` (pinned in `src/go.mod`). It needs push-audio-loopback 0.2.0-alpha or later for bus mode.
 
 ## Build and test
 
 - `cd src && go test -race ./...` runs everything except the main package's hardware paths. `go vet ./...` too.
-- `make` builds the cgo binary in Docker (golang:1.25-bookworm + libasound2-dev). `go mod tidy` runs there to create go.sum (not committed yet).
+- `make` builds the cgo binary in Docker (golang:1.25-bookworm + libasound2-dev). `go mod tidy` runs there and keeps go.sum current (committed).
 - `make test` runs vet and tests in the same container.
 - `scripts/deploy.sh` copies the binary to a Push for a manual test (service `push-hack-machinemodule`, log `/data/push-hack/logs/machinemodule.log`).
 
@@ -38,6 +39,6 @@ MachineModule: a [push-hack](https://github.com/federico-pepe/ableton-push-hack)
 
 Bump `hack.json` "version", tag `v<version>`, push the tag. The workflow checks they match, tests, builds, packages `machinemodule.tar.gz` (top directory `machinemodule/`) and commits `release.json`. The catalog entry is in `catalog-entry.json` (add it to the framework's `catalog/catalog.json`).
 
-## Not verified on hardware
+## Hardware status
 
-The Push/Live/loopback integration was written from the patterns of push-hack-braids and has only been compile-checked and smoke-tested off device. First things to check on hardware: the audio session opens and sounds; Home focus/blur; LED updates (one HTTP request per change); pad and encoder mapping; Remote Script track creation.
+Checked on a Push 3: audio through the mixer and direct to the card, the channel pair dropdown, Create tracks in Live. Not yet checked:  Home focus/blur; LED updates (one HTTP request per change); pad and encoder mapping; Remote Script track creation.
