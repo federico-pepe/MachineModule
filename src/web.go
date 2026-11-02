@@ -10,12 +10,14 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/federico-pepe/ableton-push-hack/core/alsapcm"
 	"github.com/federico-pepe/ableton-push-hack/core/httpx"
 	"github.com/federico-pepe/ableton-push-hack/core/sse"
 
+	"machinemodule/audioout"
 	"machinemodule/engine"
 	"machinemodule/livelink"
 	"machinemodule/store"
@@ -25,8 +27,9 @@ import (
 var webFS embed.FS
 
 type webServer struct {
-	a      *app
-	broker *sse.Broker[[]byte]
+	a       *app
+	broker  *sse.Broker[[]byte]
+	clients atomic.Int32 // open /sse/state streams
 }
 
 type waveInfo struct {
@@ -132,7 +135,8 @@ func (w *webServer) routes() http.Handler {
 	})
 	mux.HandleFunc("GET /sse/state", func(rw http.ResponseWriter, r *http.Request) {
 		ch := w.broker.Register()
-		defer w.broker.Unregister(ch)
+		w.clients.Add(1)
+		defer func() { w.clients.Add(-1); w.broker.Unregister(ch) }()
 		_ = sse.Serve(rw, r, ch, func(b []byte) ([]byte, error) { return b, nil })
 	})
 	mux.HandleFunc("POST /api/transport", func(rw http.ResponseWriter, r *http.Request) {
@@ -356,14 +360,23 @@ func (w *webServer) routes() http.Handler {
 			bad(rw, 400, err)
 			return
 		}
+		devices, _ := alsapcm.EnumPlaybackDevices()
+		if q.PCMDevice != nil && !audioout.HasDevice(devices, *q.PCMDevice) {
+			bad(rw, 400, errors.New("unknown audio device"))
+			return
+		}
+		if q.ChannelOffset != nil && !audioout.ValidPair(int(a.channels.Load()), *q.ChannelOffset) {
+			bad(rw, 400, errors.New("channel pair not on this card"))
+			return
+		}
 		err := a.setConfig(func(c *store.Config) {
-			if q.ChannelOffset != nil && *q.ChannelOffset >= 0 && *q.ChannelOffset <= 62 {
+			if q.ChannelOffset != nil {
 				c.ChannelOffset = *q.ChannelOffset
 			}
 			if q.MidiChannel != nil && *q.MidiChannel >= -1 && *q.MidiChannel <= 15 {
 				c.MidiChannel = *q.MidiChannel
 			}
-			if q.PCMDevice != nil && strings.HasPrefix(*q.PCMDevice, "hw:") {
+			if q.PCMDevice != nil {
 				c.PCMDevice = *q.PCMDevice
 			}
 		})
@@ -372,6 +385,16 @@ func (w *webServer) routes() http.Handler {
 			return
 		}
 		ok(rw)
+	})
+	// The audio outputs on offer. Read on demand: listing devices reads /proc,
+	// too much for the 100 ms state broadcast.
+	mux.HandleFunc("GET /api/audio", func(rw http.ResponseWriter, r *http.Request) {
+		devices, _ := alsapcm.EnumPlaybackDevices()
+		cfg := a.config()
+		httpx.JSON(rw, map[string]any{
+			"devices": audioout.Devices(devices, cfg.PCMDevice),
+			"pairs":   audioout.Pairs(int(a.channels.Load()), cfg.ChannelOffset),
+		})
 	})
 	mux.HandleFunc("POST /api/live/tracks", func(rw http.ResponseWriter, r *http.Request) {
 		res, err := livelink.EnsureTracks(livelink.Call, a.config().ChannelOffset, func(off int) error {
@@ -398,6 +421,9 @@ func (a *app) runWeb(port int, shutdown <-chan struct{}) {
 			case <-shutdown:
 				return
 			case <-t.C:
+				if w.clients.Load() == 0 {
+					continue
+				}
 				if b, err := json.Marshal(w.state()); err == nil {
 					w.broker.Broadcast(b)
 				}

@@ -23,6 +23,10 @@ type app struct {
 	cfg   store.Config
 
 	status audioStatus
+	// channels is what Live negotiated on the card; 0 until it has.
+	channels atomic.Int32
+	// offset mirrors cfg.ChannelOffset for the render loop, which must not lock.
+	offset atomic.Int32
 	focus  atomic.Bool // MachineModule owns the Push surface
 }
 
@@ -36,6 +40,7 @@ func (a *app) setConfig(f func(*store.Config)) error {
 	a.cfgMu.Lock()
 	f(&a.cfg)
 	c := a.cfg
+	a.offset.Store(int32(c.ChannelOffset))
 	a.cfgMu.Unlock()
 	return store.SaveConfig(a.hackDir, c)
 }

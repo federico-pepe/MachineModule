@@ -41,7 +41,7 @@ func TestEnsureSwitchesToOnlyPair(t *testing.T) {
 	}
 	got := -1
 	res, err := EnsureTracks(call, 0, func(o int) error { got = o; return nil })
-	if err != nil || got != 4 || len(res.Lines) < 3 {
+	if err != nil || got != 4 || len(res.Lines) != 2 {
 		t.Fatalf("%v %d %v", err, got, res.Lines)
 	}
 }

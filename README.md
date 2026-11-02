@@ -26,8 +26,9 @@ See [MANUAL.md](MANUAL.md) for the controls.
 
 1. Install **MachineModule** from the Push Hack catalog (or `make`, then `scripts/deploy.sh`).
 2. In Live: Push audio preferences, Devices, enable an input pair of the *Push Hack Virtual Audio* card.
-3. Open MachineModule's web page from the Push Hack menu, press **Create tracks in Live** (this makes an audio track that listens to the card and a MIDI track that plays notes 36-51 into MachineModule).
-   Without the Remote Script: make an audio track with that input and Monitor *In*, and a MIDI track whose output is *MachineModule MIDI In*.
+3. Open MachineModule's web page from the Push Hack menu, press **Create tracks in Live** (this makes an audio track that listens to the card; the sequencer is inside MachineModule, so no MIDI track is needed).
+   Without the Remote Script: make an audio track with that input and Monitor *In*.
+   The web page's Setup section has dropdowns for the audio output device and the channel pair.
 4. On Push, open **Push Hack Home** (Shift + Help) and choose MachineModule.
 
 ## Build

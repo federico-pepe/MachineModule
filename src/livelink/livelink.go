@@ -1,5 +1,5 @@
 // Package livelink talks to the PushHack Remote Script in Ableton Live
-// (127.0.0.1:7704, JSON lines) to make MachineModule's two tracks. Plain Go.
+// (127.0.0.1:7704, JSON lines) to make MachineModule's audio track. Plain Go.
 package livelink
 
 import (
@@ -17,8 +17,6 @@ import (
 const (
 	Addr       = "127.0.0.1:7704"
 	AudioTrack = "MachineModule"
-	MIDITrack  = "MachineModule MIDI"
-	MIDIPort   = "MachineModule MIDI In"
 	timeout    = 5 * time.Second
 )
 
@@ -117,10 +115,10 @@ type Result struct {
 	Lines []string `json:"lines"`
 }
 
-// EnsureTracks makes an audio track that reads the channel pair and a MIDI
-// track that plays into MachineModule. If Live offers exactly one stereo pair
-// on the input, that is the pair the user enabled, and setOffset switches the
-// module to it.
+// EnsureTracks makes an audio track that reads the channel pair. The
+// sequencer is inside MachineModule, so it makes no MIDI track. If Live offers
+// exactly one stereo pair on the input, that is the pair the user enabled, and
+// setOffset switches the module to it.
 func EnsureTracks(call Caller, offset int, setOffset func(int) error) (Result, error) {
 	var res Result
 	audio := map[string]any{
@@ -150,21 +148,6 @@ func EnsureTracks(call Caller, offset int, setOffset func(int) error) (Result, e
 		return res, Friendly("audio track", err)
 	}
 	res.Lines = append(res.Lines, line(AudioTrack, created(data)))
-
-	data, err = call("track", "ensure", map[string]any{
-		"kind": "midi", "name": MIDITrack,
-		"input_type": "All Ins", "output_type": MIDIPort,
-	})
-	if err != nil {
-		return res, Friendly("MIDI track", err)
-	}
-	if r := parse(data); r.Created {
-		_, _ = call("track", "select", map[string]any{"track": r.Track})
-		_, _ = call("track", "set", map[string]any{"track": r.Track, "arm": true})
-		res.Lines = append(res.Lines, line(MIDITrack, true), "Selected and armed. Notes 36-51 (C2 to D#3) play tracks 1-16.")
-	} else {
-		res.Lines = append(res.Lines, line(MIDITrack, false))
-	}
 	return res, nil
 }
 

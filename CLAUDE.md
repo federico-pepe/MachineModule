@@ -30,7 +30,7 @@ MachineModule: a [push-hack](https://github.com/federico-pepe/ableton-push-hack)
 ## Build and test
 
 - `cd src && go test -race ./...` runs everything except the main package's hardware paths. `go vet ./...` too.
-- `make` builds the cgo binary in Docker (golang:1.25-bookworm + libasound2-dev). `go mod tidy` runs there to create go.sum (not committed yet).
+- `make` builds the cgo binary in Docker (golang:1.25-bookworm + libasound2-dev). `go mod tidy` runs there and keeps go.sum current (committed).
 - `make test` runs vet and tests in the same container.
 - `scripts/deploy.sh` copies the binary to a Push for a manual test (service `push-hack-machinemodule`, log `/data/push-hack/logs/machinemodule.log`).
 
