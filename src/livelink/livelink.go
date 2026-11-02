@@ -1,5 +1,5 @@
 // Package livelink talks to the PushHack Remote Script in Ableton Live
-// (127.0.0.1:7704, JSON lines) to make MachineModule's two tracks. Plain Go.
+// (127.0.0.1:7704, JSON lines) to make MachineModule's audio track. Plain Go.
 package livelink
 
 import (
@@ -17,8 +17,6 @@ import (
 const (
 	Addr       = "127.0.0.1:7704"
 	AudioTrack = "MachineModule"
-	MIDITrack  = "MachineModule MIDI"
-	MIDIPort   = "MachineModule MIDI In"
 	timeout    = 5 * time.Second
 )
 
@@ -89,20 +87,6 @@ func ParsePair(name string) (int, bool) {
 	return a - 1, true
 }
 
-// OnlyPair is the one stereo pair among the offered names, if there is exactly one.
-func OnlyPair(options []string) (string, bool) {
-	found := ""
-	for _, o := range options {
-		if _, ok := ParsePair(o); ok {
-			if found != "" {
-				return "", false
-			}
-			found = o
-		}
-	}
-	return found, found != ""
-}
-
 func routing(e *Error) (what string, options []string) {
 	var d struct {
 		What    string   `json:"what"`
@@ -117,11 +101,11 @@ type Result struct {
 	Lines []string `json:"lines"`
 }
 
-// EnsureTracks makes an audio track that reads the channel pair and a MIDI
-// track that plays into MachineModule. If Live offers exactly one stereo pair
-// on the input, that is the pair the user enabled, and setOffset switches the
-// module to it.
-func EnsureTracks(call Caller, offset int, setOffset func(int) error) (Result, error) {
+// EnsureTracks makes an audio track that reads the channel pair. The
+// sequencer is inside MachineModule, so it makes no MIDI track. It never
+// changes the pair the user picked: if Live does not offer it on the input,
+// the error says which pairs Live does offer.
+func EnsureTracks(call Caller, offset int) (Result, error) {
 	var res Result
 	audio := map[string]any{
 		"kind": "audio", "name": AudioTrack,
@@ -131,40 +115,14 @@ func EnsureTracks(call Caller, offset int, setOffset func(int) error) (Result, e
 	data, err := call("track", "ensure", audio)
 	var pe *Error
 	if errors.As(err, &pe) && pe.Code == "bad_routing" {
-		what, opts := routing(pe)
-		if what == "channel" {
-			only, ok := OnlyPair(opts)
-			if !ok {
-				return res, fmt.Errorf("Live does not offer channels %s on Ext. In (it offers: %s). Enable the Push Hack Virtual Audio card in Push's audio preferences", PairName(offset), strings.Join(opts, ", "))
-			}
-			off, _ := ParsePair(only)
-			if serr := setOffset(off); serr != nil {
-				return res, serr
-			}
-			res.Lines = append(res.Lines, fmt.Sprintf("MachineModule now writes to channels %s, the pair Live offers.", only))
-			audio["input_channel"] = []string{only}
-			data, err = call("track", "ensure", audio)
+		if what, opts := routing(pe); what == "channel" {
+			return res, fmt.Errorf("Live does not offer channels %s on Ext. In (it offers: %s). Enable them in Push's audio preferences, or pick an offered pair under Channel pair", PairName(offset), strings.Join(opts, ", "))
 		}
 	}
 	if err != nil {
 		return res, Friendly("audio track", err)
 	}
 	res.Lines = append(res.Lines, line(AudioTrack, created(data)))
-
-	data, err = call("track", "ensure", map[string]any{
-		"kind": "midi", "name": MIDITrack,
-		"input_type": "All Ins", "output_type": MIDIPort,
-	})
-	if err != nil {
-		return res, Friendly("MIDI track", err)
-	}
-	if r := parse(data); r.Created {
-		_, _ = call("track", "select", map[string]any{"track": r.Track})
-		_, _ = call("track", "set", map[string]any{"track": r.Track, "arm": true})
-		res.Lines = append(res.Lines, line(MIDITrack, true), "Selected and armed. Notes 36-51 (C2 to D#3) play tracks 1-16.")
-	} else {
-		res.Lines = append(res.Lines, line(MIDITrack, false))
-	}
 	return res, nil
 }
 

@@ -96,10 +96,12 @@ pre{white-space:pre-wrap;margin:6px 0 0;font-size:12px;color:var(--dim)}
 <section><h2>Setup</h2>
   <div class="row">
     <button id="mktracks">Create tracks in Live</button>
-    <label>Channel pair <input id="choff" type="number" min="1" max="63" style="width:70px"></label>
+    <label>Audio output <select id="audiodev"></select></label>
+    <label>Channel pair <select id="audiopair"></select></label>
     <label>External MIDI channel <select id="midich"></select></label>
     <button id="cfg">Apply</button>
   </div>
+  <p class="note" id="busnote"></p>
   <pre id="msg"></pre>
   <div class="row" style="margin-top:10px">
     <a href="/api/project"><button>Download project</button></a>
@@ -169,9 +171,22 @@ function draw(){
     S.waves.forEach(x=>{const d=document.createElement('div');d.className='w full';d.innerHTML=`<span>UW-${String(x.slot+1).padStart(2,'0')} ${x.name.replace(/</g,'&lt;')}<br><span class="note">${(x.len/x.rate).toFixed(2)} s @ ${x.rate} Hz</span></span>`;
       const b=document.createElement('button');b.textContent='x';b.title='Clear';b.onclick=guard(()=>api('/api/wave/'+(x.slot+1),undefined,'DELETE'));d.append(b);w.append(d)});
     const im=$('imports');im.innerHTML='';S.imports.forEach(f=>im.add(new Option(f,f)))}
-  if(document.activeElement!==$('choff')&&!cfgInit){cfgInit=true;$('choff').value=S.config.channel_offset+1;$('midich').value=S.config.midi_channel}
+  if(!cfgInit){cfgInit=true;$('midich').value=S.config.midi_channel}
+  $('busnote').textContent=S.config.bus
+    ?'Audio mode: mixer. MachineModule plays through the audio mixer of push-audio-loopback, so other audio hacks (for example Braids) can play at the same time. The mixer owns the card, so the Audio output list is off. Pick a Channel pair. Live still needs an audio track that listens to this pair: press Create tracks in Live, or set the track up yourself.'
+    :'Audio mode: direct. No audio mixer was found, so MachineModule writes to the card itself. Only one audio hack can do this at a time. A newer push-audio-loopback with the audio mixer lets several hacks play together.';
+  const ak=S.audio.ok+'|'+S.config.pcm_device+'|'+S.config.channel_offset+'|'+S.config.bus;
+  if(ak!==audioKey){audioKey=ak;loadAudio()}
 }
-let buildKey='',waveKey='',cfgInit=false;
+let buildKey='',waveKey='',cfgInit=false,audioKey='';
+// The outputs come from /api/audio, not the 100 ms state: listing devices reads /proc.
+async function loadAudio(){
+  const A=await fetch('/api/audio').then(r=>r.json());
+  const d=$('audiodev');d.disabled=A.bus;d.title=A.bus?'The audio mixer owns the card; only the channel pair is chosen here.':'';
+  for(const [id,list] of [['audiodev',A.devices],['audiopair',A.pairs]]){
+    const el=$(id);if(document.activeElement===el)continue;
+    el.innerHTML='';list.forEach(o=>{const e=new Option(o.label,o.value);e.selected=o.current;el.add(e)})}
+}
 $('play').onclick=guard(()=>api('/api/transport',{action:'toggle'}));
 $('stop').onclick=guard(()=>api('/api/transport',{action:'stop'}));
 $('rec').onclick=guard(()=>api('/api/transport',{action:'record',value:S.record?0:1}));
@@ -186,8 +201,10 @@ $('kitload').onclick=kit('load');$('kitsave').onclick=kit('save');$('kitreset').
 $('upload').onclick=guard(async()=>{const f=$('file').files[0];if(!f)throw new Error('Choose a WAV file first');
   const r=await fetch('/api/wave/'+$('slot').value+'?name='+encodeURIComponent(f.name),{method:'PUT',body:f});if(!r.ok)throw new Error(await r.text());say('Loaded '+f.name)});
 $('imp').onclick=guard(async()=>{const f=$('imports').value;if(!f)throw new Error('No files in the imports folder');await api('/api/wave/'+$('slot').value+'/import?file='+encodeURIComponent(f));say('Loaded '+f)});
-$('cfg').onclick=guard(async()=>{await api('/api/config',{channel_offset:(+$('choff').value||1)-1,midi_channel:+$('midich').value});say('Saved')});
-$('mktracks').onclick=guard(async()=>{say('Working...');const r=await api('/api/live/tracks',{});say(r.lines.join('\n'))});
+$('cfg').onclick=guard(async()=>{await api('/api/config',{midi_channel:+$('midich').value});say('Saved')});
+$('audiodev').onchange=guard(async()=>{await api('/api/config',{pcm_device:$('audiodev').value});say('Audio output set')});
+$('audiopair').onchange=guard(async()=>{await api('/api/config',{channel_offset:+$('audiopair').value});say('Channel pair set')});
+$('mktracks').onclick=guard(async()=>{say('Working...');const r=await api('/api/live/tracks',{});say(r.lines.join('\n'));loadAudio()});
 $('projfile').onchange=guard(async()=>{const f=$('projfile').files[0];if(!f)return;const r=await fetch('/api/project',{method:'POST',body:f});if(!r.ok)throw new Error(await r.text());say('Project loaded')});
 Promise.all([fetch('/api/machines').then(r=>r.json()),fetch('/api/state').then(r=>r.json())]).then(([m,s])=>{M=m;S=s;build();draw();
   const es=new EventSource('/sse/state');es.onmessage=e=>{S=JSON.parse(e.data);draw()};es.onerror=()=>{$('status').textContent='reconnecting...'}});

@@ -26,9 +26,16 @@ See [MANUAL.md](MANUAL.md) for the controls.
 
 1. Install **MachineModule** from the Push Hack catalog (or `make`, then `scripts/deploy.sh`).
 2. In Live: Push audio preferences, Devices, enable an input pair of the *Push Hack Virtual Audio* card.
-3. Open MachineModule's web page from the Push Hack menu, press **Create tracks in Live** (this makes an audio track that listens to the card and a MIDI track that plays notes 36-51 into MachineModule).
-   Without the Remote Script: make an audio track with that input and Monitor *In*, and a MIDI track whose output is *MachineModule MIDI In*.
+3. Open MachineModule's web page from the Push Hack menu, press **Create tracks in Live** (this makes an audio track that listens to the card; the sequencer is inside MachineModule, so no MIDI track is needed).
+   Without the Remote Script: make an audio track with that input and Monitor *In*.
+   The web page's Setup section has a dropdown for the channel pair, and one for the audio output device when no audio mixer runs.
 4. On Push, open **Push Hack Home** (Shift + Help) and choose MachineModule.
+
+## Audio mixer
+
+MachineModule plays through the audio mixer of **push-audio-loopback** when it runs. The mixer adds the audio of all audio hacks, so MachineModule and Braids can play at the same time. The mixer owns the card, and the channel pair is chosen with the mixer (the web page's *Channel pair* list; the mixer remembers it). Without the mixer, MachineModule writes to the card itself, and only one audio hack can do that at a time. The Setup section of the web page shows which mode is active. In both modes Live needs an audio track that listens to the pair.
+
+The design is in [docs/audio-bus.md](https://github.com/federico-pepe/ableton-push-hack/blob/main/docs/audio-bus.md) in the main Push Hack repository.
 
 ## Build
 
@@ -47,7 +54,7 @@ cd src && go test -race ./...
 
 ## Status
 
-Beta. The audio engine, sequencer, and front panel has been tested on Push 3 Standalone and run with no apparent issues. Some small UI issues remain and will need sorting; please open issues if you encounter any.
+Beta. The audio engine, sequencer, and front panel has been tested on Push 3 Standalone and run with no apparent issues. Some small UI issues remain and will need sorting; please open issues if you encounter any. Playing through the audio mixer, the audio output and channel pair choice, and the Create tracks button have also been run on a Push 3.
 
 ## Not (yet) implemented
 

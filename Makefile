@@ -14,7 +14,6 @@ all: build
 build:
 	@echo "Building $(BINARY) (cgo, linux/amd64, via Docker)..."
 	$(DOCKER) sh -c "apt-get update -qq && apt-get install -qq -y libasound2-dev >/dev/null && \
-	  go mod tidy && \
 	  CGO_ENABLED=1 go build -ldflags '-s -w -linkmode external -extldflags -Wl,--dynamic-linker=/lib/ld-linux-x86-64.so.2' -o ../$(BINARY) . && \
 	  chmod +x ../$(BINARY)"
 	@echo "Done: $(BINARY)"
@@ -23,7 +22,7 @@ build:
 # (no Push, no Docker needed): `cd src && go test -race ./...`
 test:
 	$(DOCKER) sh -c "apt-get update -qq && apt-get install -qq -y libasound2-dev >/dev/null && \
-	  go mod tidy && go vet ./... && go test -race ./..."
+	  go vet ./... && go test -race ./..."
 
 clean:
 	rm -f $(BINARY)

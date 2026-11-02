@@ -4,6 +4,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/federico-pepe/ableton-push-hack/core/audiobus"
+
 	"machinemodule/engine"
 	"machinemodule/store"
 	"machinemodule/ui"
@@ -23,7 +25,14 @@ type app struct {
 	cfg   store.Config
 
 	status audioStatus
-	focus  atomic.Bool // MachineModule owns the Push surface
+	// channels is what Live negotiated on the card; 0 until it has.
+	channels atomic.Int32
+	// offset mirrors cfg.ChannelOffset for the render loop, which must not lock.
+	offset atomic.Int32
+	// busClient talks to the audio mixer (audiobus); busMode says it is in use.
+	busClient atomic.Pointer[audiobus.Client]
+	busMode   atomic.Bool
+	focus     atomic.Bool // MachineModule owns the Push surface
 }
 
 func (a *app) config() store.Config {
@@ -36,6 +45,7 @@ func (a *app) setConfig(f func(*store.Config)) error {
 	a.cfgMu.Lock()
 	f(&a.cfg)
 	c := a.cfg
+	a.offset.Store(int32(c.ChannelOffset))
 	a.cfgMu.Unlock()
 	return store.SaveConfig(a.hackDir, c)
 }
