@@ -94,7 +94,7 @@ func (w *webServer) state() map[string]any {
 		"audio":  map[string]any{"ok": ok, "message": msg},
 		"waves":  waves, "waveUsed": used, "waveTotal": total,
 		"imports": append([]string{}, a.st.ImportFiles()...),
-		"config": map[string]any{"pcm_device": cfg.PCMDevice, "channel_offset": cfg.ChannelOffset,
+		"config": map[string]any{"pcm_device": cfg.PCMDevice, "channel_offset": a.effectivePair(), "bus": a.busMode.Load(),
 			"midi_channel": cfg.MidiChannel},
 	}
 }
@@ -372,6 +372,7 @@ func (w *webServer) routes() http.Handler {
 		err := a.setConfig(func(c *store.Config) {
 			if q.ChannelOffset != nil {
 				c.ChannelOffset = *q.ChannelOffset
+				c.BusPair = *q.ChannelOffset
 			}
 			if q.MidiChannel != nil && *q.MidiChannel >= -1 && *q.MidiChannel <= 15 {
 				c.MidiChannel = *q.MidiChannel
@@ -384,6 +385,9 @@ func (w *webServer) routes() http.Handler {
 			bad(rw, 500, err)
 			return
 		}
+		if c := a.busClient.Load(); c != nil && q.ChannelOffset != nil {
+			c.SetPair(*q.ChannelOffset)
+		}
 		ok(rw)
 	})
 	// The audio outputs on offer. Read on demand: listing devices reads /proc,
@@ -393,11 +397,12 @@ func (w *webServer) routes() http.Handler {
 		cfg := a.config()
 		httpx.JSON(rw, map[string]any{
 			"devices": audioout.Devices(devices, cfg.PCMDevice),
-			"pairs":   audioout.Pairs(int(a.channels.Load()), cfg.ChannelOffset),
+			"pairs":   audioout.Pairs(int(a.channels.Load()), a.effectivePair()),
+			"bus":     a.busMode.Load(),
 		})
 	})
 	mux.HandleFunc("POST /api/live/tracks", func(rw http.ResponseWriter, r *http.Request) {
-		res, err := livelink.EnsureTracks(livelink.Call, a.config().ChannelOffset)
+		res, err := livelink.EnsureTracks(livelink.Call, a.effectivePair())
 		if err != nil {
 			bad(rw, 502, err)
 			return

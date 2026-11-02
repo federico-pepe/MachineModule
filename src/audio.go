@@ -121,6 +121,14 @@ func (a *app) superviseAudio(shutdown <-chan struct{}) {
 		}
 	}
 	defer stop()
+	var bsess *busSession
+	stopBus := func() {
+		if bsess != nil {
+			bsess.close()
+			bsess = nil
+		}
+	}
+	defer stopBus()
 	lastState := ""
 	note := func(s string) {
 		if s != lastState {
@@ -141,6 +149,27 @@ func (a *app) superviseAudio(shutdown <-chan struct{}) {
 				sess = nil
 			default:
 			}
+		}
+		if c := a.busClient.Load(); (c != nil && c.Connected()) || busUp() {
+			// A mixer owns the card: play through it, not through hw:.
+			stop()
+			if !a.busMode.Swap(true) {
+				note("audio mixer found; playing through the audio bus")
+			}
+			wait := a.busStep(&bsess)
+			select {
+			case <-shutdown:
+				return
+			case <-time.After(wait):
+			}
+			continue
+		}
+		if a.busMode.Swap(false) {
+			stopBus()
+			if c := a.busClient.Swap(nil); c != nil {
+				c.Close()
+			}
+			note("audio mixer gone; playing to the card directly")
 		}
 		wait := pollWaiting
 		hp, ok, err := hwparams.Read(cardID)

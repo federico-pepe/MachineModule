@@ -171,13 +171,14 @@ function draw(){
       const b=document.createElement('button');b.textContent='x';b.title='Clear';b.onclick=guard(()=>api('/api/wave/'+(x.slot+1),undefined,'DELETE'));d.append(b);w.append(d)});
     const im=$('imports');im.innerHTML='';S.imports.forEach(f=>im.add(new Option(f,f)))}
   if(!cfgInit){cfgInit=true;$('midich').value=S.config.midi_channel}
-  const ak=S.audio.ok+'|'+S.config.pcm_device+'|'+S.config.channel_offset;
+  const ak=S.audio.ok+'|'+S.config.pcm_device+'|'+S.config.channel_offset+'|'+S.config.bus;
   if(ak!==audioKey){audioKey=ak;loadAudio()}
 }
 let buildKey='',waveKey='',cfgInit=false,audioKey='';
 // The outputs come from /api/audio, not the 100 ms state: listing devices reads /proc.
 async function loadAudio(){
   const A=await fetch('/api/audio').then(r=>r.json());
+  const d=$('audiodev');d.disabled=A.bus;d.title=A.bus?'The audio mixer owns the card; only the channel pair is chosen here.':'';
   for(const [id,list] of [['audiodev',A.devices],['audiopair',A.pairs]]){
     const el=$(id);if(document.activeElement===el)continue;
     el.innerHTML='';list.forEach(o=>{const e=new Option(o.label,o.value);e.selected=o.current;el.add(e)})}

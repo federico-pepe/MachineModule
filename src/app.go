@@ -4,6 +4,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/federico-pepe/ableton-push-hack/core/audiobus"
+
 	"machinemodule/engine"
 	"machinemodule/store"
 	"machinemodule/ui"
@@ -27,7 +29,10 @@ type app struct {
 	channels atomic.Int32
 	// offset mirrors cfg.ChannelOffset for the render loop, which must not lock.
 	offset atomic.Int32
-	focus  atomic.Bool // MachineModule owns the Push surface
+	// busClient talks to the audio mixer (audiobus); busMode says it is in use.
+	busClient atomic.Pointer[audiobus.Client]
+	busMode   atomic.Bool
+	focus     atomic.Bool // MachineModule owns the Push surface
 }
 
 func (a *app) config() store.Config {
