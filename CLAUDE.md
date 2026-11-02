@@ -26,7 +26,7 @@ MachineModule: a [push-hack](https://github.com/federico-pepe/ableton-push-hack)
 - Push controls count only while focused (`app.focus`), and only from Push 3 client 16 port 0, channel 0 for CCs.
 - The render goroutine is pinned (`LockOSThread`, SCHED_FIFO); keep it allocation-free.
 - Audio goes through the push-audio-loopback mixer when one answers on the bus socket (`bus.go`, `core/audiobus`): float blocks to the mixer, which owns the card and the channel pair (`bus_pair` in the config, -1 = the mixer chooses). Without a mixer: open `hw:PHVAudio,1,0` with the params Live negotiated (`hwparams`), S16_LE interleaved, channel pair at `channel_offset`. `superviseAudio` switches by itself. Design: `docs/audio-bus.md` in ableton-push-hack.
-- `core/audiobus` is not in a tagged core yet: the Makefile builds against a local core checkout (`CORE`). After the tag, bump `src/go.mod` and drop the `CORE`/`MODFILE` lines.
+- `core/audiobus` comes from `core/v0.5.3` (pinned in `src/go.mod`). It needs push-audio-loopback 0.2.0-alpha or later for bus mode.
 
 ## Build and test
 

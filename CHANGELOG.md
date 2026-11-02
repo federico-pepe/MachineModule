@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Plays through the audio mixer of push-audio-loopback (audio bus) when it runs, so other audio hacks can play at the same time. Without the mixer it writes to the card directly, as before. Prototype: needs a local `core/` with `audiobus` to build.
+- Plays through the audio mixer of push-audio-loopback (audio bus) when it runs, so other audio hacks can play at the same time. Without the mixer it writes to the card directly, as before. Needs push-audio-loopback 0.2.0-alpha or later for this mode.
 
 - Web page: dropdowns for the audio output device and channel pair.
 - Create tracks in Live no longer makes a MIDI track.
