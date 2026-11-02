@@ -87,20 +87,6 @@ func ParsePair(name string) (int, bool) {
 	return a - 1, true
 }
 
-// OnlyPair is the one stereo pair among the offered names, if there is exactly one.
-func OnlyPair(options []string) (string, bool) {
-	found := ""
-	for _, o := range options {
-		if _, ok := ParsePair(o); ok {
-			if found != "" {
-				return "", false
-			}
-			found = o
-		}
-	}
-	return found, found != ""
-}
-
 func routing(e *Error) (what string, options []string) {
 	var d struct {
 		What    string   `json:"what"`
@@ -116,10 +102,10 @@ type Result struct {
 }
 
 // EnsureTracks makes an audio track that reads the channel pair. The
-// sequencer is inside MachineModule, so it makes no MIDI track. If Live offers
-// exactly one stereo pair on the input, that is the pair the user enabled, and
-// setOffset switches the module to it.
-func EnsureTracks(call Caller, offset int, setOffset func(int) error) (Result, error) {
+// sequencer is inside MachineModule, so it makes no MIDI track. It never
+// changes the pair the user picked: if Live does not offer it on the input,
+// the error says which pairs Live does offer.
+func EnsureTracks(call Caller, offset int) (Result, error) {
 	var res Result
 	audio := map[string]any{
 		"kind": "audio", "name": AudioTrack,
@@ -129,19 +115,8 @@ func EnsureTracks(call Caller, offset int, setOffset func(int) error) (Result, e
 	data, err := call("track", "ensure", audio)
 	var pe *Error
 	if errors.As(err, &pe) && pe.Code == "bad_routing" {
-		what, opts := routing(pe)
-		if what == "channel" {
-			only, ok := OnlyPair(opts)
-			if !ok {
-				return res, fmt.Errorf("Live does not offer channels %s on Ext. In (it offers: %s). Enable the Push Hack Virtual Audio card in Push's audio preferences", PairName(offset), strings.Join(opts, ", "))
-			}
-			off, _ := ParsePair(only)
-			if serr := setOffset(off); serr != nil {
-				return res, serr
-			}
-			res.Lines = append(res.Lines, fmt.Sprintf("MachineModule now writes to channels %s, the pair Live offers.", only))
-			audio["input_channel"] = []string{only}
-			data, err = call("track", "ensure", audio)
+		if what, opts := routing(pe); what == "channel" {
+			return res, fmt.Errorf("Live does not offer channels %s on Ext. In (it offers: %s). Enable them in Push's audio preferences, or pick an offered pair under Channel pair", PairName(offset), strings.Join(opts, ", "))
 		}
 	}
 	if err != nil {

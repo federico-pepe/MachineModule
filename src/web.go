@@ -397,9 +397,7 @@ func (w *webServer) routes() http.Handler {
 		})
 	})
 	mux.HandleFunc("POST /api/live/tracks", func(rw http.ResponseWriter, r *http.Request) {
-		res, err := livelink.EnsureTracks(livelink.Call, a.config().ChannelOffset, func(off int) error {
-			return a.setConfig(func(c *store.Config) { c.ChannelOffset = off })
-		})
+		res, err := livelink.EnsureTracks(livelink.Call, a.config().ChannelOffset)
 		if err != nil {
 			bad(rw, 502, err)
 			return

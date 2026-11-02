@@ -2,6 +2,7 @@ package livelink
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -17,32 +18,32 @@ func TestPair(t *testing.T) {
 			t.Fatal(bad)
 		}
 	}
-	if p, ok := OnlyPair([]string{"1", "2", "5/6"}); !ok || p != "5/6" {
-		t.Fatal("only")
+}
+
+func TestEnsureKeepsChosenPair(t *testing.T) {
+	var asked []string
+	call := func(ns, cmd string, args map[string]any) (json.RawMessage, error) {
+		asked = append(asked, args["input_channel"].([]string)[0])
+		return nil, &Error{Code: "bad_routing", Data: json.RawMessage(`{"what":"channel","options":["1","2","5/6"]}`)}
 	}
-	if _, ok := OnlyPair([]string{"1/2", "3/4"}); ok {
-		t.Fatal("two pairs")
+	_, err := EnsureTracks(call, 6)
+	if err == nil || !strings.Contains(err.Error(), "5/6") {
+		t.Fatalf("want an error naming the offered pair, got %v", err)
+	}
+	if len(asked) != 1 || asked[0] != "7/8" {
+		t.Fatalf("asked %v; must not retry on another pair", asked)
 	}
 }
 
-func TestEnsureSwitchesToOnlyPair(t *testing.T) {
-	calls := 0
+func TestEnsureMakesOnlyAudioTrack(t *testing.T) {
+	var kinds []any
 	call := func(ns, cmd string, args map[string]any) (json.RawMessage, error) {
-		if cmd == "ensure" && args["kind"] == "audio" {
-			calls++
-			if calls == 1 {
-				return nil, &Error{Code: "bad_routing", Data: json.RawMessage(`{"what":"channel","options":["1","2","5/6"]}`)}
-			}
-			if ch := args["input_channel"].([]string)[0]; ch != "5/6" {
-				t.Fatalf("retry on %s", ch)
-			}
-		}
+		kinds = append(kinds, args["kind"])
 		return json.RawMessage(`{"track":1,"created":true}`), nil
 	}
-	got := -1
-	res, err := EnsureTracks(call, 0, func(o int) error { got = o; return nil })
-	if err != nil || got != 4 || len(res.Lines) != 2 {
-		t.Fatalf("%v %d %v", err, got, res.Lines)
+	res, err := EnsureTracks(call, 2)
+	if err != nil || len(kinds) != 1 || kinds[0] != "audio" || len(res.Lines) != 1 {
+		t.Fatalf("%v %v %v", err, kinds, res.Lines)
 	}
 }
 
@@ -50,7 +51,7 @@ func TestEnsureReportsMissingPair(t *testing.T) {
 	call := func(ns, cmd string, args map[string]any) (json.RawMessage, error) {
 		return nil, &Error{Code: "bad_routing", Data: json.RawMessage(`{"what":"channel","options":["1/2","3/4"]}`)}
 	}
-	if _, err := EnsureTracks(call, 6, func(int) error { return nil }); err == nil {
+	if _, err := EnsureTracks(call, 6); err == nil {
 		t.Fatal("expected error")
 	}
 }
