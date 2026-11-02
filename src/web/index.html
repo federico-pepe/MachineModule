@@ -101,6 +101,7 @@ pre{white-space:pre-wrap;margin:6px 0 0;font-size:12px;color:var(--dim)}
     <label>External MIDI channel <select id="midich"></select></label>
     <button id="cfg">Apply</button>
   </div>
+  <p class="note" id="busnote"></p>
   <pre id="msg"></pre>
   <div class="row" style="margin-top:10px">
     <a href="/api/project"><button>Download project</button></a>
@@ -171,6 +172,9 @@ function draw(){
       const b=document.createElement('button');b.textContent='x';b.title='Clear';b.onclick=guard(()=>api('/api/wave/'+(x.slot+1),undefined,'DELETE'));d.append(b);w.append(d)});
     const im=$('imports');im.innerHTML='';S.imports.forEach(f=>im.add(new Option(f,f)))}
   if(!cfgInit){cfgInit=true;$('midich').value=S.config.midi_channel}
+  $('busnote').textContent=S.config.bus
+    ?'Audio mode: mixer. MachineModule plays through the audio mixer of push-audio-loopback, so other audio hacks (for example Braids) can play at the same time. The mixer owns the card, so the Audio output list is off. Pick a Channel pair. Live still needs an audio track that listens to this pair: press Create tracks in Live, or set the track up yourself.'
+    :'Audio mode: direct. No audio mixer was found, so MachineModule writes to the card itself. Only one audio hack can do this at a time. A newer push-audio-loopback with the audio mixer lets several hacks play together.';
   const ak=S.audio.ok+'|'+S.config.pcm_device+'|'+S.config.channel_offset+'|'+S.config.bus;
   if(ak!==audioKey){audioKey=ak;loadAudio()}
 }
