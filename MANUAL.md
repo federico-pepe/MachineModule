@@ -58,6 +58,10 @@ Put `.wav` files (8, 16, 24, 32-bit PCM or 32-bit float, mono or stereo, up to 6
 
 Open it from the Push Hack menu. It has the step grid, every parameter of every track, the global effects, kit load/save, the sample manager, project download/upload and the Live setup. It is a second view of the same instrument: changes show up on the Push and vice versa.
 
+## Audio output
+
+MachineModule sends its audio to the audio mixer of push-audio-loopback when it runs, so it can play together with other audio hacks such as Braids. Choose the channel pair on the web page (*Channel pair*). In Live, enable that pair on the input of the Push Hack Virtual Audio card and give an audio track that input (the *Create tracks in Live* button does this). Without the mixer, MachineModule writes to the card directly, the *Audio output* list is active, and no other audio hack can play at the same time.
+
 ## MIDI
 
 The module offers one MIDI input, **MachineModule MIDI In**. Route a Live MIDI track or external gear to it.
