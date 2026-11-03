@@ -141,7 +141,7 @@ function setSlider(id,val,label){const s=sliders[id];if(!s)return;if(label!==und
 function draw(){
   if(!S||!M)return;
   $('play').classList.toggle('on',S.playing);$('rec').classList.toggle('on',S.record);
-  if(document.activeElement!==$('tempo'))$('tempo').value=S.tempo.toFixed(1);
+  if(document.activeElement!==$('tempo'))$('tempo').value=(S.sync===1?S.tempoNow:S.tempo).toFixed(1);
   $('sync').value=S.sync;$('pat').textContent=S.patternName+(S.next>=0?'>'+bankName(S.next):'');
   $('kit').textContent=S.kit.name||('KIT '+(S.kit.n+1));
   if(document.activeElement!==$('patsel'))$('patsel').value=S.pattern;

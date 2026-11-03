@@ -177,10 +177,38 @@ func (e *Engine) SetTempo(bpm float64) {
 func (e *Engine) Tempo() float64 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.sync == SyncMIDI && e.extBPM > 0 {
-		return e.extBPM
+	return e.tempoLocked()
+}
+
+// tempoLocked is the tempo the sequencer and the tempo-synced delay run at:
+// the internal one, or with MIDI sync the measured MIDI clock, else Live's
+// tempo from the Remote Script, else the internal one.
+func (e *Engine) tempoLocked() float64 {
+	if e.sync == SyncMIDI {
+		if e.extBPM > 0 {
+			return e.extBPM
+		}
+		if e.liveBPM > 0 {
+			return e.liveBPM
+		}
 	}
 	return e.bpm
+}
+
+// LiveTempo tells the engine Live's tempo, read from the PushHack Remote
+// Script. It is used while MIDI sync is on and no MIDI clock arrives (Live
+// sends none unless sync is enabled for the port, and none while stopped); a
+// clock that is still arriving wins. now is the time of the reading.
+func (e *Engine) LiveTempo(bpm float64, now time.Time) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if bpm < 20 || bpm > 999 || math.IsNaN(bpm) {
+		return
+	}
+	if e.extBPM > 0 && !e.extLast.IsZero() && now.Sub(e.extLast) > time.Second {
+		e.extBPM = 0 // the clock stopped; do not hold its last tempo
+	}
+	e.liveBPM = math.Min(300, math.Max(30, bpm))
 }
 
 // SetRecord turns real-time recording of hits on or off.
@@ -258,6 +286,34 @@ func (e *Engine) ExtStart() {
 	}
 	e.startLocked()
 	e.extTarget = 0
+}
+
+// ExtJoin starts the sequencer in the middle of a song: Live was already
+// playing when MachineModule came up, so no MIDI Start arrived. beat is Live's
+// song position in quarter notes. The pattern starts where it would be had it
+// been started with Live at beat 0, so the grids line up. The MIDI clock
+// pulses that follow keep it there. Ignored unless sync is MIDI, or when the
+// sequencer is already playing.
+func (e *Engine) ExtJoin(beat float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.sync != SyncMIDI || e.playing || beat < 0 || math.IsNaN(beat) || math.IsInf(beat, 0) {
+		return
+	}
+	e.startLocked()
+	if !e.playing { // an empty song: nothing to play
+		return
+	}
+	pat := e.proj.Pattern(e.curPat)
+	total := e.fireTime(pat, pat.Len)
+	pos := math.Mod(beat*TicksPerBeat, total)
+	k := 0
+	for k < pat.Len && e.fireTime(pat, k) < pos-1e-6 {
+		k++
+	}
+	e.tick, e.nextStep = pos, k
+	e.playStep = clampi(k-1, 0, pat.Len-1)
+	e.extTicks, e.extTarget = pos, pos
 }
 
 // ExtContinue is MIDI Continue.

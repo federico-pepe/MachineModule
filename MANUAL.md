@@ -48,7 +48,9 @@ Parameter edits made while no step is held change the kit. Edits made while hold
 
 ### Sync
 
-Set *Sync* to MIDI on the PATTERN or SYSTEM page (or the web page) to follow Live's clock, start and stop.
+*Sync* is MIDI by default: MachineModule follows Live's clock, start and stop. Set it to INT on the PATTERN or SYSTEM page (or the web page) for the sequencer's own tempo. The tempo is not saved: it starts as MIDI each time.
+
+MIDI Start only reaches MachineModule at the moment Live starts. So that it also follows when Live is already playing (you opened MachineModule, or switched Sync to MIDI, in the middle of a song), MachineModule asks the PushHack Remote Script in Live whether it plays and where. When Live changes from stopped to playing, the sequencer joins at Live's position (the pattern lines up with Live's beats as if it had started with Live at beat 0). When Live stops, it stops. The tempo follows Live too: from the MIDI clock while it arrives, and otherwise from the Remote Script (Live sends no clock unless you turn on Sync for MachineModule's MIDI port, and none while it is stopped), so a tempo change in Live reaches the sequencer and the tempo-synced delay either way. It only reacts to a change of Live's transport, so a sequencer you started by hand stays on until Live stops after playing. Without the Remote Script, only MIDI Start, Stop and the clock work.
 
 ## UserWave samples
 
