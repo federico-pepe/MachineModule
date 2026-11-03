@@ -37,7 +37,7 @@ MachineModule: a [push-hack](https://github.com/federico-pepe/ableton-push-hack)
 
 ## Release
 
-Bump `hack.json` "version", tag `v<version>`, push the tag. The workflow checks they match, tests, builds, packages `machinemodule.tar.gz` (top directory `machinemodule/`) and commits `release.json`. The catalog entry is in `catalog-entry.json` (add it to the framework's `catalog/catalog.json`).
+Bump `hack.json` "version", tag `v<version>`, push the tag. The workflow checks they match, tests, builds, packages `machinemodule.tar.gz` (top directory `machinemodule/`) and commits `release.json`. `.github/workflows/release.yml` also tests and builds every push and pull request (Docker, cgo) and keeps the package as a workflow artifact, so a build can be tried before tagging; only a `v*` tag publishes the Release. The catalog entry is in `catalog-entry.json` (add it to the framework's `catalog/catalog.json`).
 
 ## Hardware status
 
