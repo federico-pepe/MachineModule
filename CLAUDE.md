@@ -42,4 +42,4 @@ Bump `hack.json` "version", tag `v<version>`, push the tag. The workflow checks 
 
 ## Hardware status
 
-Checked on a Push 3: audio through the mixer and direct to the card, the channel pair dropdown, Create tracks in Live. Not yet checked:  Home focus/blur; LED updates (one HTTP request per change); pad and encoder mapping; Remote Script track creation.
+Checked on a Push 3: audio through the mixer and direct to the card, the channel pair dropdown, Create tracks in Live, pad, button and encoder input (Push 3 as ALSA client 20), following Live's transport and tempo (Sync MIDI). Not yet checked: Home focus/blur; LED updates (one HTTP request per change).
