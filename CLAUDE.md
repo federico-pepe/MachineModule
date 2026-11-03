@@ -15,7 +15,8 @@ MachineModule: a [push-hack](https://github.com/federico-pepe/ableton-push-hack)
 | `store/` | config, project.json, waves as WAV files, imports folder, autosave | no |
 | `midimap/` | what notes/CCs mean | no |
 | `hwparams/` | parses Live's negotiated hw_params | no |
-| `livelink/` | PushHack Remote Script client (`track.ensure`) | no (Caller is injectable) |
+| `livelink/` | PushHack Remote Script client (`track.ensure`, `transport.get`) | no (Caller is injectable) |
+| `livesync/` | polls Live's transport (Remote Script) and joins/stops the sequencer on a change while Sync is MIDI | no |
 | `cmd/mmrender/` | renders a pattern to WAV | no |
 | main package | `main.go` (supervisor re-exec), `audio.go` (supervisor, direct card path), `bus.go` (audio bus client), `pcm.go`/`bridge.c` (cgo ALSA playback only, direct path), `midi.go` (port "MachineModule MIDI In"), `surface.go` (RunSurface, frames, LEDs), `web.go` + `web/index.html`, `app.go` | yes (cgo + libasound) |
 
@@ -23,10 +24,10 @@ MachineModule: a [push-hack](https://github.com/federico-pepe/ableton-push-hack)
 
 - Never write the display shm directly: frames go through `pmclient.Push` while the app owns the surface; LEDs go through `POST /api/midi/led`.
 - On-screen text is ASCII only. Never hardcode ports (`hack.json` "port" is only a default; the catalog allocates).
-- Push controls count only while focused (`app.focus`), and only from Push 3 client 16 port 0, channel 0 for CCs.
+- Push controls count only while focused (`app.focus`), and only from Push 3's Live Port (port 0, channel 0 for CCs). Its client number is looked up by name with `alsaseq.Push3` before each subscribe: it is 16 only while Push 3 is ALSA card 0, and 20 when the loopback card is card 0. Never pin `Push3ClientDefault`.
 - The render goroutine is pinned (`LockOSThread`, SCHED_FIFO); keep it allocation-free.
 - Audio goes through the push-audio-loopback mixer when one answers on the bus socket (`bus.go`, `core/audiobus`): float blocks to the mixer, which owns the card and the channel pair (`bus_pair` in the config, -1 = the mixer chooses). Without a mixer: open `hw:PHVAudio,1,0` with the params Live negotiated (`hwparams`), S16_LE interleaved, channel pair at `channel_offset`. `superviseAudio` switches by itself. Design: `docs/audio-bus.md` in ableton-push-hack.
-- `core/audiobus` comes from `core/v0.5.3` (pinned in `src/go.mod`). It needs push-audio-loopback 0.2.0-alpha or later for bus mode.
+- `core/audiobus` and `alsaseq.Push3` come from `core/v0.5.4` (pinned in `src/go.mod`). It needs push-audio-loopback 0.2.0-alpha or later for bus mode.
 
 ## Build and test
 
