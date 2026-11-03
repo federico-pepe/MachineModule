@@ -71,6 +71,7 @@ type Engine struct {
 	extTarget float64
 	extLast  time.Time
 	extBPM   float64
+	liveBPM  float64 // Live's tempo from the Remote Script; used while no MIDI clock arrives
 
 	// scratch
 	buf, mixL, mixR, sendD, sendR []float32
@@ -476,7 +477,7 @@ func (e *Engine) renderChunk(outL, outR []float32) {
 		t.resolve(&e.kit.Track[i].P, n, e.sr, &eff)
 		t.process(&eff, n, e.sr, e.buf, e.mixL, e.mixR, e.sendD, e.sendR)
 	}
-	e.fx.process(&e.kit.Global, e.bpm, n, e.mixL, e.mixR, e.sendD, e.sendR, outL, outR)
+	e.fx.process(&e.kit.Global, e.tempoLocked(), n, e.mixL, e.mixR, e.sendD, e.sendR, outL, outR)
 	for i := 0; i < n; i++ {
 		if a := absf(outL[i]); a > e.meter {
 			e.meter = a
@@ -489,11 +490,7 @@ func (e *Engine) renderChunk(outL, outR []float32) {
 
 // ticksPerSample is how many sequencer ticks one audio sample lasts.
 func (e *Engine) ticksPerSample() float64 {
-	bpm := e.bpm
-	if e.sync == SyncMIDI && e.extBPM > 0 {
-		bpm = e.extBPM
-	}
-	return bpm * TicksPerBeat / (60 * e.sr)
+	return e.tempoLocked() * TicksPerBeat / (60 * e.sr)
 }
 
 func (e *Engine) advanceTicks(samples, tps float64) {
